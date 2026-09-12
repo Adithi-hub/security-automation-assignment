@@ -3,9 +3,11 @@ import sys
 
 import pytest
 from fastapi.testclient import TestClient
+from jose import jwt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -162,3 +164,27 @@ def test_delete_scan():
     )
 
     assert resp.status_code == 204
+def test_rejects_none_algorithm_jwt():
+    import base64
+    import json
+
+    def b64url(data):
+        return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+    header = b64url(json.dumps({
+        "alg": "none",
+        "typ": "JWT",
+    }).encode())
+
+    payload = b64url(json.dumps({
+        "sub": "testuser123",
+    }).encode())
+
+    token = f"{header}.{payload}."
+
+    resp = client.get(
+        "/scans",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert resp.status_code == 401
