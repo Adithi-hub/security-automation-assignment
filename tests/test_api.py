@@ -210,3 +210,45 @@ def test_search_scans_handles_sql_injection_payload():
     assert isinstance(resp.json(), dict)
     assert resp.json()["count"] == 0
     assert resp.json()["results"] == []
+def test_user_cannot_access_another_users_scan():
+    user_a_token = register_and_login()
+
+    scan_response = client.post(
+        "/scans",
+        json={
+            "title": "Private scan",
+            "severity": "high",
+            "affected_component": "private component",
+        },
+        headers=auth_headers(user_a_token),
+    )
+
+    assert scan_response.status_code == 201
+    scan_id = scan_response.json()["id"]
+
+    client.post(
+        "/auth/register",
+        json={
+            "username": "different_user",
+            "email": "different@example.com",
+            "password": "DifferentPassword123!",
+        },
+    )
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "username": "different_user",
+            "password": "DifferentPassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+    user_b_token = login_response.json()["access_token"]
+
+    response = client.get(
+        f"/scans/{scan_id}",
+        headers=auth_headers(user_b_token),
+    )
+
+    assert response.status_code == 404
