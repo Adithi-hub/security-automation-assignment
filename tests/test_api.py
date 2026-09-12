@@ -8,7 +8,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database import Base, get_db
@@ -164,6 +163,8 @@ def test_delete_scan():
     )
 
     assert resp.status_code == 204
+
+
 def test_rejects_none_algorithm_jwt():
     import base64
     import json
@@ -171,14 +172,18 @@ def test_rejects_none_algorithm_jwt():
     def b64url(data):
         return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
-    header = b64url(json.dumps({
-        "alg": "none",
-        "typ": "JWT",
-    }).encode())
+    header = b64url(
+        json.dumps({
+            "alg": "none",
+            "typ": "JWT",
+        }).encode()
+    )
 
-    payload = b64url(json.dumps({
-        "sub": "testuser123",
-    }).encode())
+    payload = b64url(
+        json.dumps({
+            "sub": "testuser123",
+        }).encode()
+    )
 
     token = f"{header}.{payload}."
 
@@ -188,3 +193,20 @@ def test_rejects_none_algorithm_jwt():
     )
 
     assert resp.status_code == 401
+
+
+def test_search_scans_handles_sql_injection_payload():
+    token = register_and_login()
+
+    malicious_query = "' OR '1'='1"
+
+    resp = client.get(
+        "/scans/search",
+        params={"q": malicious_query},
+        headers=auth_headers(token),
+    )
+
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), dict)
+    assert resp.json()["count"] == 0
+    assert resp.json()["results"] == []
