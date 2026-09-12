@@ -7,14 +7,12 @@ import httpx
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from app.share_links import router as share_router
 from sqlalchemy.orm import Session
-
-import models
-from auth import create_access_token, get_current_user, get_password_hash, verify_password
-from config import NOTIFY_SERVICE_URL
-from database import engine, get_db, search_scans_by_query
-
-logging.basicConfig(level=logging.INFO)
+from app import models
+from app.auth import create_access_token, get_current_user, get_password_hash, verify_password
+from app.config import NOTIFY_SERVICE_URL
+from app.database import engine, get_db, search_scans_by_query
 logger = logging.getLogger(__name__)
 
 models.Base.metadata.create_all(bind=engine)
@@ -25,6 +23,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.include_router(share_router)
 
 @app.middleware("http")
 async def cors_middleware(request: Request, call_next):
@@ -279,3 +278,4 @@ def delete_scan(
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "vulntracker-api"}
+import secrets
