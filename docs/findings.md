@@ -1,89 +1,65 @@
-\# Security Findings
+# Security Findings
 
+## 1. Assessment Overview
 
+The application and supporting infrastructure were assessed across four areas:
 
-\## Overview
+- SAST â€” Python application source code
+- SCA â€” Python and notification-service dependencies
+- Container security â€” Docker image vulnerabilities
+- IaC security â€” Terraform configuration
 
+The assessment focused on exploitable application weaknesses, dependency risk, container posture, infrastructure configuration, and the security of the shared scan-link feature introduced for this assignment.
 
+---
 
-Security testing was performed across the Python application source code, third-party dependencies, container image, and Terraform infrastructure configuration.
+## 2. Findings Summary
 
+| ID | Finding | Severity | Source | Status | Origin |
+|---|---|---|---|---|---|
+| F-01 | JWT algorithm validation weakness | High | SAST/manual review | Remediated | Starter code |
+| F-02 | SQL injection in scan search | Critical | SAST/manual review | Remediated | Starter code |
+| F-03 | Cross-user scan access / IDOR | High | Manual security review | Remediated | Starter code |
+| F-04 | Hardcoded application secrets | High | SAST/manual review | Remediated | Starter code |
+| F-05 | Plaintext password logging | High | Manual review | Remediation planned | Starter code |
+| F-06 | Overly permissive CORS | Medium | Manual review | Remediation planned | Starter code |
+| F-07 | Detailed exception information | Medium | Manual review | Remediation planned | Starter code |
+| F-08 | Shared-link password brute-force risk | High | Manual security review | Remediated | New feature |
+| F-09 | Unrestricted security-group egress | Critical | IaC scan/manual review | Remediated | Starter code |
+| F-10 | Public subnet exposure | High | IaC scan/manual review | Remediated | Starter code |
+| F-11 | Invalid load-balancer headers accepted | High | IaC scan/manual review | Remediated | Starter code |
+| F-12 | Container base-image OS vulnerabilities | High | Container scan | Residual risk | New deployment configuration |
+| F-13 | Notification-service dependency vulnerabilities | High | npm audit/SCA | Residual risk | Starter code |
+| F-14 | Secrets Manager not using customer-managed KMS key | Low | IaC scan | Residual risk | Deployment configuration |
+| F-15 | VPC Flow Logs not enabled | Medium | IaC scan | Residual risk | Deployment configuration |
 
+---
 
-The analysis focused on identifying vulnerabilities that could affect confidentiality, integrity, availability, authentication, authorization, and deployment security.
+# 3. Detailed Findings
 
+## F-01 â€” JWT Algorithm Validation Weakness
 
+**Severity:** High
+**Source:** SAST / manual security review
+**Type:** Authentication
+**Origin:** Starter code
+**Status:** Remediated
 
-\## Findings Summary
+The original JWT validation allowed token decoding without sufficiently restricting the accepted signing algorithm.
 
+An attacker able to influence the token algorithm could potentially bypass intended JWT signature-validation controls.
 
+### Business impact
 
-| ID | Tool / Scan | Finding | Severity | Source | Business Impact | Status |
+Successful authentication bypass could allow an attacker to access protected application functionality or data.
 
-|---|---|---|---|---|---|---|
+### Remediation
 
-| F-01 | Bandit / SAST | JWT algorithm was not restricted during token validation | High | Starter code | An attacker could potentially bypass authentication if an unsigned or unexpected JWT algorithm were accepted | Remediated |
-
-| F-02 | Manual review | SQL injection in scan search functionality | Critical | Starter code | Could allow unauthorized database queries and exposure or modification of application data | Remediated |
-
-| F-03 | Manual review | Missing ownership check when accessing scan results | High | Starter code | An authenticated user could potentially access another user's scan result | Remediated |
-
-| F-04 | Manual review | Hardcoded application/database secrets | High | Starter code | Secrets stored in source code could be exposed through source control or application distribution | Remediated |
-
-| F-05 | Manual review | Plaintext password included in login logging | High | Starter code | Credentials could be exposed through application logs and subsequently accessed by unauthorized users | Remediation planned |
-
-| F-06 | Manual review | Overly permissive CORS configuration | Medium | Starter code | Untrusted web origins could interact with the API and increase the risk of unauthorized browser-based requests | Remediation planned |
-
-| F-07 | Manual review | Detailed exception/traceback information exposed by the global error handler | Medium | Starter code | Internal implementation details could be disclosed to attackers and assist further attacks | Remediation planned |
-
-| F-08 | pip-audit / SCA | ecdsa dependency has a known timing-attack vulnerability with no available upstream fix | Medium | Third-party dependency | Under specific cryptographic signing/key-generation use cases, timing information could potentially expose private-key information | Residual risk |
-
-| F-09 | Trivy / IaC | Security group rules allowed unrestricted public egress | Critical | Starter infrastructure configuration | Compromised workloads could communicate with arbitrary external destinations | Remediated |
-
-| F-10 | Trivy / IaC | Public subnet allowed public IP assignment | High | Starter infrastructure configuration | Resources could become directly reachable from the internet | Remediated |
-
-| F-11 | Trivy / IaC | Application Load Balancer accepted invalid headers | High | Infrastructure configuration | Invalid headers could be forwarded to backend services and increase request-processing attack surface | Remediated |
-
-| F-12 | Trivy / Container | No Critical or High severity findings identified in the application container image | Informational | Container image | No Critical/High container vulnerability was identified during the scan | Reviewed |
-
-
-
-\## Detailed Findings
-
-
-
-\### F-01 — JWT Algorithm Validation
-
-
-
-\*\*Severity:\*\* High
-
-\*\*Source:\*\* Starter code
-
-\*\*Type:\*\* Authentication
-
-
-
-The JWT validation logic did not explicitly restrict the accepted signing algorithm.
-
-
-
-An attacker able to provide a token using an unexpected or unsigned algorithm could potentially bypass authentication.
-
-
-
-\*\*Remediation:\*\* JWT decoding was changed to explicitly allow the configured signing algorithm.
-
-
+JWT decoding was changed to explicitly use the configured signing algorithm:
 
 ```python
-
-payload = jwt.decode(
-
-&#x20;   token,
-
-&#x20;   SECRET\_KEY,
-
-&#x20;   algorithms=\[ALGORITHM],
-
+jwt.decode(
+    token,
+    SECRET_KEY,
+    algorithms=[ALGORITHM],
 )

@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.74.0"
   },
-  "ReportID": "01a099cc-8069-7bff-a690-c26eaa656383",
-  "CreatedAt": "2026-09-13T08:05:11.40178896Z",
+  "ReportID": "01a09aa2-a688-732c-a24c-61d0cf01e211",
+  "CreatedAt": "2026-09-13T11:59:05.864210743Z",
   "ArtifactName": "/workdir/terraform",
   "ArtifactType": "filesystem",
   "Results": [
