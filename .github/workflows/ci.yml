@@ -97,21 +97,23 @@ jobs:
 
       - name: Check dependencies for high or critical vulnerabilities
         run: |
+          mkdir -p sca-input
+          cp requirements.txt sca-input/requirements.txt
           docker run --rm \
-            -v "$PWD:/workdir" \
+            -v "$PWD/sca-input:/workdir" \
             aquasec/trivy:0.74.0 fs \
             --scanners vuln \
             --severity HIGH,CRITICAL \
             --exit-code 1 \
             --format json \
-            --output /workdir/reports/sca.trivy.json \
+            --output /workdir/sca.trivy.json \
             /workdir
 
       - name: Upload Trivy SCA report
         uses: actions/upload-artifact@v4
         with:
           name: sca.trivy.json
-          path: reports/sca.trivy.json
+          path: sca-input/sca.trivy.json
 
   container-scan:
     runs-on: ubuntu-latest
@@ -172,52 +174,6 @@ jobs:
             --exit-code 1 \
             /workdir/terraform
 
-      - name: Upload IaC scan report
-        uses: actions/upload-artifact@v4
-        with:
-          name: iac.trivy.json
-          path: reports/iac.trivy.json
-### F-13 — Notification Service Dependency Vulnerabilities
-
-
-**Type:** Third-Party Dependency
-
-The notification service contains production dependency vulnerabilities reported by `npm audit`.
-
-The affected dependency chain includes `qs`, `send`/`serve-static`, and `uuid`.
-
-The available automatic remediation requires breaking dependency upgrades, including upgrading Express and UUID beyond the currently declared dependency ranges.
-
-**Business impact:**
-
-Vulnerable dependencies may expose the notification service to denial-of-service, cross-site scripting, or other dependency-specific security risks depending on how the affected functionality is exercised.
-
-**Decision:**
-
-The dependencies are not automatically upgraded with `npm audit fix --force` because that operation would introduce breaking dependency changes without first validating application compatibility.
-
-**Recommended remediation:**
-
-- Review and upgrade Express to a maintained compatible version.
-- Upgrade `uuid` to a supported secure version.
-- Regenerate and review the lock file.
-- Run the complete notification-service test suite after upgrades.
-- Re-run `npm audit` and verify that High/Critical vulnerabilities are resolved.
-
-**Status:** Residual risk / remediation required.
-### Notification Service Dependencies
-
-**Severity:** High
-
-**Residual Risk:** The notification service currently has High severity dependency vulnerabilities reported by `npm audit`.
-
-**Remediation:** Upgrade the affected Express dependency chain and `uuid` to maintained versions, validate compatibility, regenerate the lock file, and rerun the full test and dependency scans.
-
-**Effort:** Medium
-
-**Compensating Controls:** Keep the notification service isolated from unnecessary network exposure, restrict access to required endpoints, and continue automated dependency scanning in CI.
-
-**Status:** Open.
       - name: Upload IaC scan report
         uses: actions/upload-artifact@v4
         with:
