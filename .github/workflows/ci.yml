@@ -95,23 +95,131 @@ jobs:
           name: sca.pip-audit.json
           path: reports/sca.pip-audit.json
 
-  # TODO (candidates): Add the following security scanning jobs.
-  # Tool selection is your decision — document your choices in findings.md.
-  #
-  # sast:
-  #   Static Application Security Testing against app/ source code
-  #   Upload JSON report as a build artifact named sast.<tool>.json
-  #   Build should fail on critical findings
-  #
-  # sca:
-  #   Dependency / Software Composition Analysis against requirements.txt
-  #   Upload JSON report as a build artifact named sca.<tool>.json
-  #   Build should fail on critical or high severity CVEs
-  #
-  # container-scan:
-  #   Build the Docker image, then scan it for vulnerabilities and misconfigurations
-  #   Upload JSON report as a build artifact named container.<tool>.json
-  #
-  # iac-scan:
-  #   Scan the Helm chart or Terraform configuration for security misconfigurations
-  #   Upload JSON report as a build artifact named iac.<tool>.json
+      - name: Check dependencies for high or critical vulnerabilities
+        run: |
+          docker run --rm \
+            -v "$PWD:/workdir" \
+            aquasec/trivy:0.74.0 fs \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --format json \
+            --output /workdir/reports/sca.trivy.json \
+            /workdir
+
+      - name: Upload Trivy SCA report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sca.trivy.json
+          path: reports/sca.trivy.json
+
+  container-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t security-automation-assignment:ci .
+
+      - name: Scan container image with Trivy
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/reports:/reports" \
+            aquasec/trivy:0.74.0 image \
+            --severity HIGH,CRITICAL \
+            --format json \
+            --output /reports/container.trivy.json \
+            security-automation-assignment:ci
+
+      - name: Check container for high or critical vulnerabilities
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.74.0 image \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            security-automation-assignment:ci
+
+      - name: Upload container scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: container.trivy.json
+          path: reports/container.trivy.json
+
+  iac-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan Terraform with Trivy
+        run: |
+          docker run --rm \
+            -v "$PWD:/workdir" \
+            aquasec/trivy:0.74.0 config \
+            --format json \
+            --output /workdir/reports/iac.trivy.json \
+            /workdir/terraform
+
+      - name: Check Terraform for high or critical findings
+        run: |
+          docker run --rm \
+            -v "$PWD:/workdir" \
+            aquasec/trivy:0.74.0 config \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            /workdir/terraform
+
+      - name: Upload IaC scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: iac.trivy.json
+          path: reports/iac.trivy.json
+### F-13 — Notification Service Dependency Vulnerabilities
+
+
+**Type:** Third-Party Dependency
+
+The notification service contains production dependency vulnerabilities reported by `npm audit`.
+
+The affected dependency chain includes `qs`, `send`/`serve-static`, and `uuid`.
+
+The available automatic remediation requires breaking dependency upgrades, including upgrading Express and UUID beyond the currently declared dependency ranges.
+
+**Business impact:**
+
+Vulnerable dependencies may expose the notification service to denial-of-service, cross-site scripting, or other dependency-specific security risks depending on how the affected functionality is exercised.
+
+**Decision:**
+
+The dependencies are not automatically upgraded with `npm audit fix --force` because that operation would introduce breaking dependency changes without first validating application compatibility.
+
+**Recommended remediation:**
+
+- Review and upgrade Express to a maintained compatible version.
+- Upgrade `uuid` to a supported secure version.
+- Regenerate and review the lock file.
+- Run the complete notification-service test suite after upgrades.
+- Re-run `npm audit` and verify that High/Critical vulnerabilities are resolved.
+
+**Status:** Residual risk / remediation required.
+### Notification Service Dependencies
+
+**Severity:** High
+
+**Residual Risk:** The notification service currently has High severity dependency vulnerabilities reported by `npm audit`.
+
+**Remediation:** Upgrade the affected Express dependency chain and `uuid` to maintained versions, validate compatibility, regenerate the lock file, and rerun the full test and dependency scans.
+
+**Effort:** Medium
+
+**Compensating Controls:** Keep the notification service isolated from unnecessary network exposure, restrict access to required endpoints, and continue automated dependency scanning in CI.
+
+**Status:** Open.
+      - name: Upload IaC scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: iac.trivy.json
+          path: reports/iac.trivy.json
