@@ -71,6 +71,30 @@ jobs:
           name: sast.bandit.json
           path: reports/sast.bandit.json
 
+  sca:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        run: |
+          pip-audit -r requirements.txt -f json -o reports/sca.pip-audit.json || true
+
+      - name: Upload pip-audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sca.pip-audit.json
+          path: reports/sca.pip-audit.json
+
   # TODO (candidates): Add the following security scanning jobs.
   # Tool selection is your decision — document your choices in findings.md.
   #
