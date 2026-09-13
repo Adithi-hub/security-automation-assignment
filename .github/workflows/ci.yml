@@ -23,6 +23,8 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v
+        env:
+          SECRET_KEY: ci-test-secret-key
 
   test-notify:
     runs-on: ubuntu-latest
