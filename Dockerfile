@@ -1,4 +1,5 @@
-FROM python:3.11.9-slim-bookworm
+FROM python:3.11.16-slim-trixie
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -10,8 +11,9 @@ RUN useradd --system --gid appuser --create-home appuser
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools==84.0.0 "wheel>=0.46.2"
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade PyJWT msgpack setuptools
 
 COPY app ./app
 
