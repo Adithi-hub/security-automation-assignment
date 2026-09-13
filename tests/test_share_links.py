@@ -92,3 +92,51 @@ def test_create_share_link():
 
     assert response.status_code == 200
     assert "share_url" in response.json()
+def test_password_protected_share_link_locks_after_failed_attempts():
+    token = register_and_login()
+
+    scan_response = client.post(
+        "/scans",
+        json={
+            "title": "Protected shared scan",
+            "severity": "high",
+            "affected_component": "test component",
+        },
+        headers=auth_headers(token),
+    )
+
+    assert scan_response.status_code == 201
+    scan_id = scan_response.json()["id"]
+
+    response = client.post(
+        f"/scans/{scan_id}/share",
+        json={"password": "CorrectPassword123!"},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+
+    share_url = response.json()["share_url"]
+    share_token = share_url.rstrip("/").split("/")[-1]
+
+    # First four incorrect passwords are rejected.
+    for _ in range(4):
+        response = client.get(
+            f"/share/{share_token}",
+            params={"password": "WrongPassword"},
+        )
+        assert response.status_code == 403
+
+    # The fifth incorrect password triggers the lockout.
+    response = client.get(
+        f"/share/{share_token}",
+        params={"password": "WrongPassword"},
+    )
+    assert response.status_code == 429
+
+    # Correct password is also blocked while the link is locked.
+    response = client.get(
+        f"/share/{share_token}",
+        params={"password": "CorrectPassword123!"},
+    )
+    assert response.status_code == 429

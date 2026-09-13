@@ -42,5 +42,7 @@ class ShareLink(Base):
     scan_id = Column(Integer, ForeignKey("scan_results.id"), nullable=False)
     expires_at = Column(DateTime, nullable=False)
     password_hash = Column(String(200), nullable=True)
+    failed_attempts = Column(Integer, nullable=False, default=0)
+    locked_until = Column(DateTime, nullable=True)
 
     scan = relationship("ScanResult")

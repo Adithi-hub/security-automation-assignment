@@ -10,6 +10,7 @@ from app import models
 from app.auth import get_current_user, get_password_hash, verify_password
 from app.database import get_db
 
+
 router = APIRouter(tags=["share links"])
 
 
@@ -87,22 +88,56 @@ def get_shared_scan(
     )
 
     if not share_link:
-        raise HTTPException(status_code=404, detail="Share link not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Share link not found",
+        )
 
-    if share_link.expires_at <= datetime.utcnow():
-        raise HTTPException(status_code=410, detail="Share link has expired")
+    now = datetime.utcnow()
+
+    if share_link.expires_at <= now:
+        raise HTTPException(
+            status_code=410,
+            detail="Share link has expired",
+        )
 
     if share_link.password_hash:
+        if share_link.locked_until and share_link.locked_until > now:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many failed password attempts. Try again later.",
+            )
+
         if not password:
             raise HTTPException(
                 status_code=401,
                 detail="Password required",
             )
 
-        if not check_share_password(password, share_link.password_hash):
+        if not check_share_password(
+            password,
+            share_link.password_hash,
+        ):
+            share_link.failed_attempts += 1
+
+            if share_link.failed_attempts >= 5:
+                share_link.locked_until = now + timedelta(minutes=15)
+                db.commit()
+
+                raise HTTPException(
+                    status_code=429,
+                    detail="Too many failed password attempts. Try again later.",
+                )
+
+            db.commit()
+
             raise HTTPException(
                 status_code=403,
                 detail="Invalid password",
             )
+
+        share_link.failed_attempts = 0
+        share_link.locked_until = None
+        db.commit()
 
     return share_link.scan
