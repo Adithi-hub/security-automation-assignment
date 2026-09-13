@@ -60,7 +60,7 @@ jobs:
         run: pip install bandit
 
       - name: Run Bandit SAST
-        run: bandit -r app -f json -o reports/sast.bandit.json
+        run: bandit -r app -f json -o reports/sast.bandit.json || [ $? -eq 1 ]
 
       - name: Check for high severity findings
         run: bandit -r app --severity-level high
